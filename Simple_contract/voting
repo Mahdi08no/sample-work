@@ -1,0 +1,86 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Voting {
+    // ساختار کاندیدا
+    struct Candidate {
+        string name; // نام کاندیدا
+        uint256 votes; // تعداد آرا
+    }
+
+    address public owner; // مدیر قرارداد
+    bool public votingActive; // وضعیت باز یا بسته بودن رأی‌گیری
+
+    Candidate[] public candidates; // لیست کاندیداها
+    mapping(address => bool) public hasVoted; // بررسی اینکه آیا کاربر رأی داده است یا خیر
+
+    // رویدادها
+    event CandidateAdded(string name);
+    event VoteCasted(address voter, string candidateName);
+    event VotingEnded(string winnerName, uint256 winnerVotes);
+
+    // مودیفایرها
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only the owner can perform this action");
+        _;
+    }
+
+    modifier votingOpen() {
+        require(votingActive, "Voting is not active");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+        votingActive = true; // رأی‌گیری از ابتدا باز است
+    }
+
+    // اضافه کردن کاندیدا (فقط توسط مدیر قرارداد)
+    function addCandidate(string memory _name) external onlyOwner {
+        require(bytes(_name).length > 0, "Candidate name cannot be empty");
+        candidates.push(Candidate({name: _name, votes: 0}));
+        emit CandidateAdded(_name);
+    }
+
+    // رأی دادن به یک کاندیدا
+    function vote(uint256 _candidateIndex) external votingOpen {
+        require(!hasVoted[msg.sender], "You have already voted");
+        require(_candidateIndex < candidates.length, "Invalid candidate index");
+
+        candidates[_candidateIndex].votes += 1;
+        hasVoted[msg.sender] = true;
+
+        emit VoteCasted(msg.sender, candidates[_candidateIndex].name);
+    }
+
+    // مشاهده تعداد آرا هر کاندیدا
+    function getVotes(uint256 _candidateIndex) external view returns (string memory, uint256) {
+        require(_candidateIndex < candidates.length, "Invalid candidate index");
+        Candidate memory candidate = candidates[_candidateIndex];
+        return (candidate.name, candidate.votes);
+    }
+
+    // پایان رأی‌گیری و اعلام برنده
+    function endVoting() external onlyOwner {
+        require(votingActive, "Voting is already ended");
+
+        votingActive = false;
+
+        uint256 maxVotes = 0;
+        string memory winnerName;
+
+        for (uint256 i = 0; i < candidates.length; i++) {
+            if (candidates[i].votes > maxVotes) {
+                maxVotes = candidates[i].votes;
+                winnerName = candidates[i].name;
+            }
+        }
+
+        emit VotingEnded(winnerName, maxVotes);
+    }
+
+    // دریافت تعداد کل کاندیداها
+    function getCandidateCount() external view returns (uint256) {
+        return candidates.length;
+    }
+}
